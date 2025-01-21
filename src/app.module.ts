@@ -1,53 +1,47 @@
 import { Module, OnModuleInit } from '@nestjs/common';
-import { TypeOrmModule } from '@nestjs/typeorm';
-import { DataSource } from 'typeorm';
-import { UserService } from './user.service';
+import { InjectRepository, TypeOrmModule } from '@nestjs/typeorm';
 import { User } from './user.entity';
 import { RedisModule, RedisService } from '@liaoliaots/nestjs-redis';
+import { Repository } from 'typeorm';
 
 @Module({
   imports: [
     TypeOrmModule.forRoot({
       type: 'postgres',
-      host: 'localhost',
-      port: 5432,
-      username: 'postgres',
-      password: 'Harsh@2123',
-      database: 'docker_compose',
+      host: process.env.DB_HOST || 'localhost', // default to localhost
+      port: parseInt(process.env.DB_PORT ?? '5432', 10), // default to 5432
+      username: process.env.DB_USERNAME || 'postgres',
+      password: process.env.DB_PASSWORD || 'Harsh@2123',
+      database: process.env.DB_NAME || 'docker_compose',
       autoLoadEntities: true,
       synchronize: true,
     }),
+
     RedisModule.forRoot({
       config: {
-        host: 'localhost', // Redis server host
-        port: 6379, // Redis server port
+        host: process.env.REDIS_HOST, // Redis server host
+        port: parseInt(process.env.REDIS_PORT ?? '6379', 10), // Redis server port
+        password: process.env.REDIS_PASSWORD,
       },
     }),
     TypeOrmModule.forFeature([User]),
   ],
-  providers: [UserService],
+  providers: [],
 })
 export class AppModule implements OnModuleInit {
   constructor(
-    private readonly dataSource: DataSource,
     private readonly redisService: RedisService,
+    @InjectRepository(User)
+    private userRepository: Repository<User>,
   ) {}
 
   async onModuleInit() {
-    // PostgreSQL connection
-    if (!this.dataSource.isInitialized) {
-      try {
-        await this.dataSource.initialize();
-        console.log('PostgreSQL database connected');
-      } catch (error) {
-        console.error(
-          `Error connecting to the PostgreSQL database: ${error}`,
-          error,
-        );
-        return;
-      }
-    } else {
-      console.log('PostgreSQL database  connected');
+    // Inside your onModuleInit() or any method
+    try {
+      await this.userRepository.createQueryBuilder().getMany(); // Simple query to check connection
+      console.log('Database is connected');
+    } catch (error) {
+      console.error('Database connection error:', error);
     }
 
     // Redis connection

@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  app:
+    # image: node:alpine
+    container_name: app
+    build:
+      context: .
+      dockerfile: Dockerfile
+    command: node dist/main.js
+    ports:
+      - '3001:3001'
+    env_file:
+      - .env
+    restart: always
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - default
+
+  redis:
+    container_name: redis
+    image: redis:6.2-alpine
+    command: ['redis-server', '--requirepass', '${REDIS_PASSWORD}']
+    healthcheck:
+      test: ['CMD', 'redis-cli', '-a', '${REDIS_PASSWORD}', 'ping']
+      interval: 10s
+      timeout: 30s
+      retries: 5
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    expose:
+      - 6379
+    networks:
+      - default
+    restart: always
+networks:
+  default:
+    name: ${DOCKER_LOCAL_NETWORK}
+    driver: bridge
