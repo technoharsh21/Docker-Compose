@@ -1,23 +1,37 @@
-FROM node:alpine
+FROM node:alpine AS dependencies
 
-# Set the working directory
 WORKDIR /usr/src/app
 
-# Copy package.json and pnpm-lock.yaml (if using pnpm)
 COPY package.json ./
 COPY pnpm-lock.yaml ./
 
-# Install pnpm globally
-RUN npm install -g pnpm
+RUN npm install -g pnpm && pnpm install
 
-# Install dependencies
-RUN pnpm install
+# Stage 2: Build application
 
-# Copy the rest of your application code
+FROM node:alpine AS builder
+
+WORKDIR /usr/src/app
+
+COPY --from=dependencies /usr/src/app/node_modules ./node_modules
 COPY . .
 
-# Expose the port your app runs on
+RUN npm install -g pnpm && pnpm install 
+
+RUN pnpm run build
+
+# Stage 3: Production-ready image
+
+FROM node:alpine AS production
+
+WORKDIR /usr/src/app
+
+COPY --from=builder /usr/src/app/dist ./dist
+COPY package.json ./
+COPY pnpm-lock.yaml ./
+
+RUN npm install -g pnpm && pnpm install --prod
+
 EXPOSE 3000
 
-CMD ["pnpm",  "start:dev"]
-
+CMD ["node", "dist/main.js"]
